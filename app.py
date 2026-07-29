@@ -1,14 +1,4 @@
-# ... 기존 코드 ...
 import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-import os
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import balanced_accuracy_score
-
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -24,29 +14,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 알고리즘 비교용 모델 학습 함수 추가
-# ---------------------------------------------------------
-@st.cache_data
-def evaluate_fs_methods(df, labels):
-    """
-    각기 다른 FS Method(임의 시뮬레이션)를 가정하여 모델 성능 도출
-    실제 환경에서는 각 Method별 선택된 컬럼 리스트를 사용함
-    """
-    results = []
-    methods = ['S2N', 'Ttest', 'Ftest', 'Pearson', 'Gram Schmidt', 'Relief']
-    
-    # 예시를 위한 가상 성능 데이터 생성 (실제로는 여기서 각 Method별 Feature Selection 수행)
-    np.random.seed(42)
-    for method in methods:
-        ber = 40 - np.random.rand() * 10 
-        true_pos = 50 + np.random.rand() * 10
-        true_neg = 70 + np.random.rand() * 8
-        results.append({'FS Method': method, 'BER (%)': round(ber, 2), 'True + (%)': round(true_pos, 2), 'True - (%)': round(true_neg, 2)})
-    
-    return pd.DataFrame(results)
-
-# ---------------------------------------------------------
-# 메인 화면 구성 중 tab3 내용 수정
+# 데이터 로드 및 전처리 (캐싱 적용)
 # ---------------------------------------------------------
 @st.cache_data
 def load_data():
@@ -217,23 +185,35 @@ with tab2:
     st.plotly_chart(fig_scatter, use_container_width=True)
 
 with tab3:
-    st.subheader("특징 선택 알고리즘 성능 비교")
-    st.caption("각 알고리즘별로 선별된 특징을 사용했을 때의 모델 성능 (Random Forest 기반)")
+    st.subheader("특징 선택 알고리즘 성능 비교 (40 Features)")
+    st.caption("10-fold cross validation 및 단순 Kernel Ridge Classifier 기준")
     
-    # 모델 평가 실행
-    df_results = evaluate_fs_methods(raw_data, labels)
+    # 이 부분은 분석 결과값이므로 기존 하드코딩된 값 유지
+    baseline_data = {
+        'FS Method': ['S2N (Signal to Noise)', 'Ttest', 'Ftest', 'Pearson', 'Gram Schmidt', 'Relief'],
+        'BER (%)': [34.5, 33.7, 33.5, 34.1, 35.6, 40.1],
+        'True + (%)': [57.8, 59.6, 59.1, 57.4, 51.2, 48.3],
+        'True - (%)': [73.1, 73.0, 73.8, 74.4, 77.5, 71.6]
+    }
+    df_baseline = pd.DataFrame(baseline_data)
     
     col_chart, col_table = st.columns([1.2, 1])
     
     with col_chart:
+        # Plotly Grouped Bar Chart
         fig_bar = go.Figure()
-        fig_bar.add_trace(go.Bar(x=df_results['FS Method'], y=df_results['BER (%)'], name='BER (%)', marker_color='#f59e0b'))
-        fig_bar.add_trace(go.Bar(x=df_results['FS Method'], y=df_results['True + (%)'], name='True + (%)', marker_color='#ef4444'))
-        fig_bar.add_trace(go.Bar(x=df_results['FS Method'], y=df_results['True - (%)'], name='True - (%)', marker_color='#22c55e'))
+        fig_bar.add_trace(go.Bar(x=df_baseline['FS Method'], y=df_baseline['BER (%)'], name='BER (낮을수록 좋음)', marker_color='#f59e0b'))
+        fig_bar.add_trace(go.Bar(x=df_baseline['FS Method'], y=df_baseline['True + (%)'], name='True + (Fail 정확도)', marker_color='#ef4444'))
+        fig_bar.add_trace(go.Bar(x=df_baseline['FS Method'], y=df_baseline['True - (%)'], name='True - (Pass 정확도)', marker_color='#22c55e'))
         
         fig_bar.update_layout(barmode='group', height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_bar, use_container_width=True)
         
     with col_table:
-        st.dataframe(df_results, use_container_width=True, hide_index=True)
-        st.info("알고리즘별로 데이터를 선택하는 기준이 다르므로, 특정 목적(불량 검출력 vs 전체 정확도)에 맞춰 FS 기법을 선택해야 합니다.")
+        st.dataframe(
+            df_baseline.style.highlight_min(subset=['BER (%)'], color='#dbeafe')
+                           .highlight_max(subset=['True - (%)'], color='#dcfce3'),
+            use_container_width=True,
+            hide_index=True
+        )
+        st.info("**인사이트:** 노이즈가 많은 반도체 데이터 특성상 단순 필터링 기법(Ftest, Ttest)이 가장 안정적인 균형 에러율(BER)을 보여줍니다.")

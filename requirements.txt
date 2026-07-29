@@ -2,4 +2,4 @@ streamlit
 pandas
 numpy
 plotly
-scikit-learn==1.4.1.post1
+scikit-learn
